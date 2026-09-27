@@ -15,7 +15,7 @@ function fitImage(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
     const img = new Image();
     img.onload = () => {
-      const size = 256;
+      const size = 96;
       const canvas = document.createElement("canvas");
       canvas.width = size;
       canvas.height = size;
@@ -30,7 +30,7 @@ function fitImage(file: File): Promise<string> {
       const h = img.height * scale;
       ctx.drawImage(img, (size - w) / 2, (size - h) / 2, w, h);
       URL.revokeObjectURL(url);
-      resolve(canvas.toDataURL("image/jpeg", 0.82));
+      resolve(canvas.toDataURL("image/jpeg", 0.6));
     };
     img.onerror = () => {
       URL.revokeObjectURL(url);
