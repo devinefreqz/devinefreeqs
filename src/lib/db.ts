@@ -1,9 +1,5 @@
-import { neonConfig, Pool as NeonPool } from "@neondatabase/serverless";
-import ws from "ws";
+import { neon } from "@neondatabase/serverless";
 import { pendingMigrations } from "../../scripts/migration-plan.mjs";
-
-neonConfig.webSocketConstructor = ws;
-neonConfig.poolQueryViaFetch = true;
 
 /** Which database backend is active. */
 export type DbSource = "neon" | "pglite";
@@ -99,7 +95,17 @@ export function normalizePostgresUrl(raw: string): string {
 }
 
 export function createNeonPool(connectionString: string) {
-  return new NeonPool({ connectionString: normalizePostgresUrl(connectionString) });
+  const sql = neon(normalizePostgresUrl(connectionString), { fullResults: true });
+  const query = async (text: string, params?: unknown[]) => sql.query(text, params ?? []);
+  const client = {
+    query,
+    release() {},
+  };
+  return {
+    query,
+    connect: async () => client,
+    end: async () => {},
+  };
 }
 function createNeonSql(): Promise<Sql> {
   globalRef.__pgSqlPromise__ ??= (async () => {
