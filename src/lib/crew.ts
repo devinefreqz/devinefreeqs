@@ -1,27 +1,21 @@
 import { createServerFn } from "@tanstack/react-start";
 import { authMiddleware } from "@/lib/auth/middleware";
 
-const FOUNDER_NAMES = new Set(["darcy", "darcy gray", "sage"]);
 const WORK_ROLES = ["Security", "Medical", "Door sales", "Production", "Bar"] as const;
 
 export type Rank = "Founder" | "Crew Member";
 
 type Actor = { userId: string; name: string; rank: Rank; founder: boolean };
 
-function isFounderName(name: string) {
-  return FOUNDER_NAMES.has(name.trim().toLowerCase());
-}
-
 async function actor(userId: string): Promise<Actor> {
   const { getSql } = await import("@/lib/db");
   const sql = await getSql();
   const users = await sql<{ name: string }>`select name from "user" where id = ${userId}`;
   const name = users[0]?.name?.trim() || "Crew";
-  const promoted = isFounderName(name);
   const existing = await sql<{ rank: string }>`select rank from profiles where user_id = ${userId}`;
-  let rank: Rank = promoted ? "Founder" : "Crew Member";
+  let rank: Rank = "Crew Member";
   if (existing[0]) {
-    rank = existing[0].rank === "Founder" || promoted ? "Founder" : "Crew Member";
+    rank = existing[0].rank === "Founder" ? "Founder" : "Crew Member";
     await sql`update profiles set name = ${name}, rank = ${rank} where user_id = ${userId}`;
   } else {
     await sql`insert into profiles (user_id, name, rank) values (${userId}, ${name}, ${rank})`;

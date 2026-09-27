@@ -15,6 +15,10 @@ function Login() {
     const email = String(form.get("email") ?? "").trim().toLowerCase();
     const password = String(form.get("password") ?? "");
     const name = String(form.get("username") ?? "").trim();
+    if (mode === "up" && /^(darcy|darcy gray|sage)$/i.test(name)) {
+      setError("That username is reserved.");
+      return;
+    }
     if (mode === "up" && !/^[a-zA-Z0-9][a-zA-Z0-9 .'-]{1,31}$/.test(name)) {
       setError("Username needs 2–32 letters or numbers.");
       return;
@@ -54,7 +58,7 @@ function Login() {
         <img src="/logo.jpg" alt="" className="mx-auto mb-4 h-20 w-20 object-contain invert" />
         <h1 className="text-center font-display text-xl tracking-widest">DEVINE FREQUENCIES</h1>
         <p className="mt-2 text-center text-sm text-muted">
-          Crew members create an account with a username, email, and password. You can view the board. Darcy and Sage are Founders.
+          Crew members create an account with a username, email, and password. Darcy and Sage are reserved usernames.
         </p>
         {authEnabled ? (
           <>
