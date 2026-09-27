@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { UserButton } from "@/lib/auth/gates";
+import { roleColor } from "@/lib/role-colors";
 import {
   addEquipment,
   addEvent,
@@ -148,6 +148,56 @@ function Stat({ label, value, tone }: { label: string; value: string; tone?: "go
   );
 }
 
+function RolePie({ slices }: { slices: { name: string; value: number; color: string }[] }) {
+  const ordered = [...slices].sort((a, b) => b.value - a.value);
+  const drawn = ordered.filter((slice) => slice.value > 0);
+  const total = drawn.reduce((sum, slice) => sum + slice.value, 0);
+  if (!total) return <p className="text-sm text-muted">Nobody assigned yet</p>;
+  const r = 70;
+  const cx = 90;
+  const cy = 90;
+  let angle = -Math.PI / 2;
+  return (
+    <div className="flex flex-wrap items-center gap-4">
+      <svg viewBox="0 0 180 180" className="h-44 w-44 shrink-0" role="img" aria-label="Roles by crew count">
+        {drawn.length === 1 ? (
+          <circle cx={cx} cy={cy} r={r} fill={drawn[0].color} />
+        ) : (
+          drawn.map((slice) => {
+            const sweep = (slice.value / total) * Math.PI * 2;
+            const start = angle;
+            angle += sweep;
+            const large = sweep > Math.PI ? 1 : 0;
+            const x1 = cx + r * Math.cos(start);
+            const y1 = cy + r * Math.sin(start);
+            const x2 = cx + r * Math.cos(angle);
+            const y2 = cy + r * Math.sin(angle);
+            return (
+              <path
+                key={slice.name}
+                d={`M ${cx} ${cy} L ${x1} ${y1} A ${r} ${r} 0 ${large} 1 ${x2} ${y2} Z`}
+                fill={slice.color}
+              >
+                <title>{`${slice.name}: ${slice.value}`}</title>
+              </path>
+            );
+          })
+        )}
+      </svg>
+      <ul className="flex flex-col gap-1 text-sm">
+        {ordered.map((slice) => (
+          <li key={slice.name} className="flex items-center gap-2">
+            <span className="h-3 w-3 rounded-full" style={{ background: slice.color }} />
+            <span>
+              {slice.name} · {slice.value}
+            </span>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
 function Events({
   board,
   founder,
@@ -158,6 +208,7 @@ function Events({
   run: (action: () => Promise<unknown>) => Promise<void>;
 }) {
   const [open, setOpen] = useState<{ eventId: number; role: string } | null>(null);
+  const [rosterId, setRosterId] = useState<number | null>(null);
   const openEvent = open ? board.events.find((ev) => ev.id === open.eventId) : null;
   const openCrew = open ? board.shifts.filter((s) => s.event_id === open.eventId && s.role === open.role) : [];
   const mineOnOpen = openCrew.some((s) => s.user_id === board.me.userId);
@@ -229,11 +280,12 @@ function Events({
                     key={role}
                     type="button"
                     aria-pressed={myRoles.has(role)}
-                    className={
-                      myRoles.has(role)
-                        ? "min-h-11 rounded-full bg-fg px-3 text-sm text-ink"
-                        : "min-h-11 rounded-full border border-line px-3 text-sm"
-                    }
+                    className="min-h-11 rounded-full border px-3 text-sm font-medium"
+                    style={{
+                      background: myRoles.has(role) ? roleColor(role) : "transparent",
+                      borderColor: roleColor(role),
+                      color: myRoles.has(role) ? "#111111" : roleColor(role),
+                    }}
                     onClick={() => setOpen({ eventId: ev.id, role })}
                   >
                     {role}
@@ -271,6 +323,76 @@ function Events({
                 <span className="text-sm text-muted">Nobody signed yet</span>
               )}
             </div>
+            <button
+              type="button"
+              className="mt-4 min-h-11 rounded-xl border border-line px-3 text-sm"
+              aria-expanded={rosterId === ev.id}
+              onClick={() => setRosterId(rosterId === ev.id ? null : ev.id)}
+            >
+              {rosterId === ev.id ? "Hide roster" : "Roster"}
+            </button>
+            {rosterId === ev.id ? (
+              <div className="mt-3 rounded-2xl border border-line bg-bg p-4">
+                <RolePie
+                  slices={board.roles.map((role) => ({
+                    name: role,
+                    value: roster.filter((s) => s.role === role).length,
+                    color: roleColor(role),
+                  }))}
+                />
+                <table className="mt-4 w-full text-left text-sm">
+                  <thead>
+                    <tr className="text-xs tracking-widest text-muted uppercase">
+                      <th className="py-2 font-medium">Crew</th>
+                      <th className="py-2 font-medium">Roles</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {people.length ? (
+                      people.map((person) => {
+                        const roles = roster.filter((s) => s.user_id === person.user_id).map((s) => s.role);
+                        return (
+                          <tr key={person.user_id} className="border-t border-line">
+                            <td className="py-2 pr-3">
+                              <span className="flex items-center gap-2">
+                                {person.image ? (
+                                  <img src={person.image} alt="" className="h-8 w-8 rounded-full object-cover" />
+                                ) : (
+                                  <span className="grid h-8 w-8 place-items-center rounded-full bg-black/10 text-xs font-medium">
+                                    {(person.name || "?").charAt(0).toUpperCase()}
+                                  </span>
+                                )}
+                                {person.name}
+                                {roles.length > 1 ? <span className="text-xs text-muted">Doubling up</span> : null}
+                              </span>
+                            </td>
+                            <td className="py-2">
+                              <span className="flex flex-wrap gap-1">
+                                {roles.map((role) => (
+                                  <span
+                                    key={role}
+                                    className="rounded-full px-2 py-1 text-xs font-medium"
+                                    style={{ background: roleColor(role), color: "#111111" }}
+                                  >
+                                    {role}
+                                  </span>
+                                ))}
+                              </span>
+                            </td>
+                          </tr>
+                        );
+                      })
+                    ) : (
+                      <tr>
+                        <td className="py-2 text-muted" colSpan={2}>
+                          Nobody signed yet
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            ) : null}
           </article>
         );
       })}
@@ -285,7 +407,9 @@ function Events({
           >
             <div className="flex items-start justify-between gap-3">
               <div>
-                <h3 className="font-display text-lg">{open.role}</h3>
+                <h3 className="font-display text-lg" style={{ color: roleColor(open.role) }}>
+                  {open.role}
+                </h3>
                 <p className="text-sm text-muted">{openEvent.name}</p>
               </div>
               <button type="button" className="min-h-11 px-2 text-sm text-muted" onClick={() => setOpen(null)}>
