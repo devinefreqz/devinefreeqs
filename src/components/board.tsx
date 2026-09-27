@@ -8,6 +8,7 @@ import {
   deleteEquipment,
   deleteEvent,
   deleteLedger,
+  dropRole,
   loadBoard,
   setShift,
   type Rank,
@@ -200,7 +201,8 @@ function Events({
       ) : null}
       {board.events.map((ev) => {
         const roster = board.shifts.filter((s) => s.event_id === ev.id);
-        const mine = roster.find((s) => s.user_id === board.me.userId);
+        const people = roster.filter((s, i) => roster.findIndex((other) => other.user_id === s.user_id) === i);
+        const myRoles = new Set(roster.filter((s) => s.user_id === board.me.userId).map((s) => s.role));
         return (
           <article key={ev.id} className="rounded-2xl border border-line bg-surface p-4">
             <div className="flex flex-wrap items-start justify-between gap-3">
@@ -229,9 +231,9 @@ function Events({
                   <button
                     key={role}
                     type="button"
-                    aria-pressed={mine?.role === role}
+                    aria-pressed={myRoles.has(role)}
                     className={
-                      mine?.role === role
+                      myRoles.has(role)
                         ? "min-h-11 rounded-full bg-fg px-3 text-sm text-ink"
                         : "min-h-11 rounded-full border border-line px-3 text-sm"
                     }
@@ -242,7 +244,7 @@ function Events({
                   </button>
                 );
               })}
-              {mine ? (
+              {myRoles.size ? (
                 <button
                   type="button"
                   className="min-h-11 rounded-full border border-line px-3 text-sm text-bad"
@@ -253,8 +255,8 @@ function Events({
               ) : null}
             </div>
             <div className="mt-4 flex flex-wrap gap-3 border-t border-line pt-3">
-              {roster.length ? (
-                roster.map((s) => (
+              {people.length ? (
+                people.map((s) => (
                   <div key={s.user_id} className="group relative" title={s.name}>
                     {s.image ? (
                       <img src={s.image} alt={s.name} className="h-11 w-11 rounded-full object-cover" />
@@ -266,7 +268,6 @@ function Events({
                     <span className="pointer-events-none absolute bottom-full left-1/2 z-10 mb-1 -translate-x-1/2 whitespace-nowrap rounded-md bg-fg px-2 py-1 text-xs text-ink opacity-0 group-hover:opacity-100">
                       {s.name}
                     </span>
-                    <p className="mt-1 max-w-16 truncate text-center text-[10px] text-muted">{s.role}</p>
                   </div>
                 ))
               ) : (
@@ -316,10 +317,11 @@ function Events({
               type="button"
               className="mt-4 min-h-11 w-full rounded-xl bg-fg text-sm font-semibold text-ink"
               onClick={() => {
-                if (!mineOnOpen) void run(() => setShift({ data: { eventId: open.eventId, role: open.role } }));
+                if (mineOnOpen) void run(() => dropRole({ data: { eventId: open.eventId, role: open.role } }));
+                else void run(() => setShift({ data: { eventId: open.eventId, role: open.role } }));
               }}
             >
-              {mineOnOpen ? "You're on this" : "Put me on this"}
+              {mineOnOpen ? "Take me off this role" : "Put me on this"}
             </button>
           </div>
         </div>

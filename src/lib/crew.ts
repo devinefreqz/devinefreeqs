@@ -147,7 +147,7 @@ export const setShift = createServerFn({ method: "POST" })
     const sql = await getSql();
     await sql`insert into shifts (event_id, user_id, name, role)
       values (${data.eventId}, ${me.userId}, ${me.name}, ${data.role})
-      on conflict (event_id, user_id) do update set role = ${data.role}, name = ${me.name}`;
+      on conflict (event_id, user_id, role) do update set name = ${me.name}`;
     return { ok: true };
   });
 
@@ -159,6 +159,17 @@ export const clearShift = createServerFn({ method: "POST" })
     const { getSql } = await import("@/lib/db");
     const sql = await getSql();
     await sql`delete from shifts where event_id = ${eventId} and user_id = ${me.userId}`;
+    return { ok: true };
+  });
+
+export const dropRole = createServerFn({ method: "POST" })
+  .middleware([authMiddleware])
+  .validator((input: { eventId: number; role: string }) => input)
+  .handler(async ({ context, data }) => {
+    const me = await actor(context.userId);
+    const { getSql } = await import("@/lib/db");
+    const sql = await getSql();
+    await sql`delete from shifts where event_id = ${data.eventId} and user_id = ${me.userId} and role = ${data.role}`;
     return { ok: true };
   });
 
