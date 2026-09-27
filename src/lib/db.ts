@@ -1,6 +1,8 @@
 import { neonConfig, Pool as NeonPool } from "@neondatabase/serverless";
+import ws from "ws";
 import { pendingMigrations } from "../../scripts/migration-plan.mjs";
 
+neonConfig.webSocketConstructor = ws;
 neonConfig.poolQueryViaFetch = true;
 
 /** Which database backend is active. */
