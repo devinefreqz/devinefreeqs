@@ -159,6 +159,11 @@ function Events({
   founder: boolean;
   run: (action: () => Promise<unknown>) => Promise<void>;
 }) {
+  const [open, setOpen] = useState<{ eventId: number; role: string } | null>(null);
+  const openEvent = open ? board.events.find((ev) => ev.id === open.eventId) : null;
+  const openCrew = open ? board.shifts.filter((s) => s.event_id === open.eventId && s.role === open.role) : [];
+  const mineOnOpen = openCrew.some((s) => s.user_id === board.me.userId);
+
   return (
     <section className="flex flex-col gap-4">
       {founder ? (
@@ -218,21 +223,25 @@ function Events({
             </div>
             <p className="mt-4 text-xs tracking-widest text-muted uppercase">Working this night</p>
             <div className="mt-2 flex flex-wrap gap-2">
-              {board.roles.map((role) => (
-                <button
-                  key={role}
-                  type="button"
-                  aria-pressed={mine?.role === role}
-                  className={
-                    mine?.role === role
-                      ? "min-h-11 rounded-full bg-fg px-3 text-sm text-ink"
-                      : "min-h-11 rounded-full border border-line px-3 text-sm"
-                  }
-                  onClick={() => void run(() => setShift({ data: { eventId: ev.id, role } }))}
-                >
-                  {role}
-                </button>
-              ))}
+              {board.roles.map((role) => {
+                const count = roster.filter((s) => s.role === role).length;
+                return (
+                  <button
+                    key={role}
+                    type="button"
+                    aria-pressed={mine?.role === role}
+                    className={
+                      mine?.role === role
+                        ? "min-h-11 rounded-full bg-fg px-3 text-sm text-ink"
+                        : "min-h-11 rounded-full border border-line px-3 text-sm"
+                    }
+                    onClick={() => setOpen({ eventId: ev.id, role })}
+                  >
+                    {role}
+                    {count ? ` ${count}` : ""}
+                  </button>
+                );
+              })}
               {mine ? (
                 <button
                   type="button"
@@ -267,6 +276,54 @@ function Events({
           </article>
         );
       })}
+      {open && openEvent ? (
+        <div className="fixed inset-0 z-40 grid place-items-center bg-black/60 p-4" onClick={() => setOpen(null)}>
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-label={open.role}
+            className="w-full max-w-sm rounded-2xl border border-line bg-surface p-4"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <h3 className="font-display text-lg">{open.role}</h3>
+                <p className="text-sm text-muted">{openEvent.name}</p>
+              </div>
+              <button type="button" className="min-h-11 px-2 text-sm text-muted" onClick={() => setOpen(null)}>
+                Close
+              </button>
+            </div>
+            <ul className="mt-4 flex flex-col gap-2">
+              {openCrew.length ? (
+                openCrew.map((s) => (
+                  <li key={s.user_id} className="flex items-center gap-3">
+                    {s.image ? (
+                      <img src={s.image} alt="" className="h-10 w-10 rounded-full object-cover" />
+                    ) : (
+                      <span className="grid h-10 w-10 place-items-center rounded-full bg-black/10 text-sm font-medium">
+                        {(s.name || "?").charAt(0).toUpperCase()}
+                      </span>
+                    )}
+                    <span className="text-sm">{s.name}</span>
+                  </li>
+                ))
+              ) : (
+                <li className="text-sm text-muted">Nobody on this role yet</li>
+              )}
+            </ul>
+            <button
+              type="button"
+              className="mt-4 min-h-11 w-full rounded-xl bg-fg text-sm font-semibold text-ink"
+              onClick={() => {
+                if (!mineOnOpen) void run(() => setShift({ data: { eventId: open.eventId, role: open.role } }));
+              }}
+            >
+              {mineOnOpen ? "You're on this" : "Put me on this"}
+            </button>
+          </div>
+        </div>
+      ) : null}
     </section>
   );
 }
