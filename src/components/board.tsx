@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { UserButton } from "@/lib/auth/gates";
+import { useCurrentUser } from "@/lib/auth/use-current-user";
 import { roleColor } from "@/lib/role-colors";
 import {
   addEquipment,
@@ -18,6 +19,7 @@ import {
 
 type Board = Awaited<ReturnType<typeof loadBoard>>;
 type View = "overview" | "events" | "finance" | "equipment" | "crew";
+type Save = (action: () => Promise<unknown>, patch?: (board: Board) => Board) => Promise<void>;
 
 const NAV: { id: View; label: string }[] = [
   { id: "overview", label: "Overview" },
@@ -40,11 +42,13 @@ export function Board() {
   const [view, setView] = useState<View>("overview");
   const pull = useRef(0);
   const seen = useRef<Board | null>(null);
+  const busy = useRef(0);
 
   async function refresh(quiet = false) {
     const ticket = ++pull.current;
     try {
       const next = await loadBoard();
+      if (quiet && busy.current) return;
       if (ticket !== pull.current && seen.current) return;
       seen.current = next;
       setBoard(next);
@@ -83,12 +87,25 @@ export function Board() {
     };
   }, []);
 
-  async function run(action: () => Promise<unknown>) {
+  async function run(action: () => Promise<unknown>, patch?: (board: Board) => Board) {
+    busy.current += 1;
+    const snapshot = seen.current;
+    if (patch && snapshot) {
+      const next = patch(snapshot);
+      seen.current = next;
+      setBoard(next);
+    }
     try {
       await action();
       await refresh();
     } catch (err) {
+      if (snapshot) {
+        seen.current = snapshot;
+        setBoard(snapshot);
+      }
       setError(err instanceof Error ? err.message : "That did not save");
+    } finally {
+      busy.current -= 1;
     }
   }
 
@@ -238,10 +255,11 @@ function Events({
 }: {
   board: Board;
   founder: boolean;
-  run: (action: () => Promise<unknown>) => Promise<void>;
+  run: Save;
 }) {
   const [open, setOpen] = useState<{ eventId: number; role: string } | null>(null);
   const [rosterId, setRosterId] = useState<number | null>(null);
+  const photo = useCurrentUser()?.profileImageUrl ?? null;
   const openEvent = open ? board.events.find((ev) => ev.id === open.eventId) : null;
   const openCrew = open ? board.shifts.filter((s) => s.event_id === open.eventId && s.role === open.role) : [];
   const mineOnOpen = openCrew.some((s) => s.user_id === board.me.userId);
@@ -254,15 +272,21 @@ function Events({
           onSubmit={(e) => {
             e.preventDefault();
             const form = new FormData(e.currentTarget);
-            void run(() =>
-              addEvent({
-                data: {
-                  name: String(form.get("name") ?? ""),
-                  date: String(form.get("date") ?? ""),
-                  time: String(form.get("time") ?? ""),
-                  venue: String(form.get("venue") ?? ""),
-                  notes: String(form.get("notes") ?? ""),
-                },
+            const data = {
+              name: String(form.get("name") ?? ""),
+              date: String(form.get("date") ?? ""),
+              time: String(form.get("time") ?? ""),
+              venue: String(form.get("venue") ?? ""),
+              notes: String(form.get("notes") ?? ""),
+            };
+            void run(
+              () => addEvent({ data }),
+              (current) => ({
+                ...current,
+                events: [
+                  ...current.events,
+                  { id: -Date.now(), name: data.name, event_date: data.date, event_time: data.time, venue: data.venue, notes: data.notes },
+                ],
               }),
             );
             e.currentTarget.reset();
@@ -298,7 +322,16 @@ function Events({
                 <button
                   type="button"
                   className="min-h-11 rounded-xl border border-line px-3 text-sm text-bad"
-                  onClick={() => void run(() => deleteEvent({ data: ev.id }))}
+                  onClick={() =>
+                    void run(
+                      () => deleteEvent({ data: ev.id }),
+                      (current) => ({
+                        ...current,
+                        events: current.events.filter((item) => item.id !== ev.id),
+                        shifts: current.shifts.filter((item) => item.event_id !== ev.id),
+                      }),
+                    )
+                  }
                 >
                   Delete
                 </button>
@@ -330,7 +363,15 @@ function Events({
                 <button
                   type="button"
                   className="min-h-11 rounded-full border border-line px-3 text-sm text-bad"
-                  onClick={() => void run(() => clearShift({ data: ev.id }))}
+                  onClick={() =>
+                    void run(
+                      () => clearShift({ data: ev.id }),
+                      (current) => ({
+                        ...current,
+                        shifts: current.shifts.filter((item) => !(item.event_id === ev.id && item.user_id === current.me.userId)),
+                      }),
+                    )
+                  }
                 >
                   Not working
                 </button>
@@ -471,8 +512,34 @@ function Events({
               type="button"
               className="mt-4 min-h-11 w-full rounded-xl bg-fg text-sm font-semibold text-ink"
               onClick={() => {
-                if (mineOnOpen) void run(() => dropRole({ data: { eventId: open.eventId, role: open.role } }));
-                else void run(() => setShift({ data: { eventId: open.eventId, role: open.role } }));
+                if (!open) return;
+                const eventId = open.eventId;
+                const role = open.role;
+                if (mineOnOpen) {
+                  void run(
+                    () => dropRole({ data: { eventId, role } }),
+                    (current) => ({
+                      ...current,
+                      shifts: current.shifts.filter(
+                        (item) => !(item.event_id === eventId && item.user_id === current.me.userId && item.role === role),
+                      ),
+                    }),
+                  );
+                } else {
+                  void run(
+                    () => setShift({ data: { eventId, role } }),
+                    (current) =>
+                      current.shifts.some((item) => item.event_id === eventId && item.user_id === current.me.userId && item.role === role)
+                        ? current
+                        : {
+                            ...current,
+                            shifts: [
+                              ...current.shifts,
+                              { event_id: eventId, user_id: current.me.userId, name: current.me.name, role, image: photo },
+                            ],
+                          },
+                  );
+                }
               }}
             >
               {mineOnOpen ? "Take me off this role" : "Put me on this"}
@@ -495,7 +562,7 @@ function Finance({
   founder: boolean;
   income: number;
   expense: number;
-  run: (action: () => Promise<unknown>) => Promise<void>;
+  run: Save;
 }) {
   const tickets = board.ledger.filter((row) => (row.external_id ?? "").startsWith("humanitix:"));
   const books = board.ledger.filter((row) => !(row.external_id ?? "").startsWith("humanitix:"));
@@ -550,16 +617,31 @@ function Finance({
           onSubmit={(e) => {
             e.preventDefault();
             const form = new FormData(e.currentTarget);
-            void run(() =>
-              addLedger({
-                data: {
-                  source: String(form.get("source") ?? ""),
-                  amount: Number(form.get("amount")),
-                  date: String(form.get("date") ?? ""),
-                  kind: String(form.get("kind") ?? "expense"),
-                  category: String(form.get("category") ?? "Other"),
-                  notes: String(form.get("notes") ?? ""),
-                },
+            const data = {
+              source: String(form.get("source") ?? ""),
+              amount: Number(form.get("amount")),
+              date: String(form.get("date") ?? ""),
+              kind: String(form.get("kind") ?? "expense"),
+              category: String(form.get("category") ?? "Other"),
+              notes: String(form.get("notes") ?? ""),
+            };
+            void run(
+              () => addLedger({ data }),
+              (current) => ({
+                ...current,
+                ledger: [
+                  {
+                    id: -Date.now(),
+                    entry_date: data.date,
+                    kind: data.kind,
+                    category: data.category,
+                    source: data.source,
+                    amount: data.amount,
+                    notes: data.notes,
+                    external_id: null,
+                  },
+                  ...current.ledger,
+                ],
               }),
             );
             e.currentTarget.reset();
@@ -618,7 +700,16 @@ function Finance({
                 </td>
                 {founder ? (
                   <td className="px-3 py-3">
-                    <button type="button" className="text-bad" onClick={() => void run(() => deleteLedger({ data: row.id }))}>
+                    <button
+                      type="button"
+                      className="text-bad"
+                      onClick={() =>
+                        void run(
+                          () => deleteLedger({ data: row.id }),
+                          (current) => ({ ...current, ledger: current.ledger.filter((item) => item.id !== row.id) }),
+                        )
+                      }
+                    >
                       Delete
                     </button>
                   </td>
@@ -641,7 +732,7 @@ function Gear({
   board: Board;
   founder: boolean;
   total: number;
-  run: (action: () => Promise<unknown>) => Promise<void>;
+  run: Save;
 }) {
   const [open, setOpen] = useState(false);
   return (
@@ -664,13 +755,16 @@ function Gear({
           onSubmit={(e) => {
             e.preventDefault();
             const form = new FormData(e.currentTarget);
-            void run(() =>
-              addEquipment({
-                data: {
-                  qty: Number(form.get("qty")),
-                  name: String(form.get("name") ?? ""),
-                  unitCost: Number(form.get("unitCost")),
-                },
+            const data = {
+              qty: Number(form.get("qty")),
+              name: String(form.get("name") ?? ""),
+              unitCost: Number(form.get("unitCost")),
+            };
+            void run(
+              () => addEquipment({ data }),
+              (current) => ({
+                ...current,
+                gear: [{ id: -Date.now(), name: data.name, qty: data.qty, unit_cost: data.unitCost, notes: "" }, ...current.gear],
               }),
             );
             e.currentTarget.reset();
@@ -699,7 +793,16 @@ function Gear({
               </p>
             </div>
             {founder ? (
-              <button type="button" className="min-h-11 text-sm text-bad" onClick={() => void run(() => deleteEquipment({ data: item.id }))}>
+              <button
+                type="button"
+                className="min-h-11 text-sm text-bad"
+                onClick={() =>
+                  void run(
+                    () => deleteEquipment({ data: item.id }),
+                    (current) => ({ ...current, gear: current.gear.filter((gear) => gear.id !== item.id) }),
+                  )
+                }
+              >
                 Remove
               </button>
             ) : null}

@@ -12,15 +12,20 @@ const WORK_ROLES = ["Security", "Medical", "Door sales", "Production", "Bar"] as
 async function actor(userId: string): Promise<Actor> {
   const { getSql } = await import("@/lib/db");
   const sql = await getSql();
-  const users = await sql<{ name: string; email: string }>`select name, email from "user" where id = ${userId}`;
-  const name = users[0]?.name?.trim() || "Crew";
-  const founderEmail = FOUNDER_EMAILS.has((users[0]?.email ?? "").trim().toLowerCase());
-  const existing = await sql<{ rank: string }>`select rank from profiles where user_id = ${userId}`;
-  const rank: Rank = founderEmail || existing[0]?.rank === "Founder" ? "Founder" : "Crew Member";
-  if (existing[0]) {
+  const rows = await sql<{ name: string; email: string; rank: string | null; profile_name: string | null }>`
+    select u.name, u.email, p.rank, p.name as profile_name
+    from "user" u
+    left join profiles p on p.user_id = u.id
+    where u.id = ${userId}
+  `;
+  const name = rows[0]?.name?.trim() || "Crew";
+  const founderEmail = FOUNDER_EMAILS.has((rows[0]?.email ?? "").trim().toLowerCase());
+  const rank: Rank = founderEmail || rows[0]?.rank === "Founder" ? "Founder" : "Crew Member";
+  if (!rows[0]?.rank) {
+    await sql`insert into profiles (user_id, name, rank) values (${userId}, ${name}, ${rank})
+      on conflict (user_id) do update set name = ${name}, rank = ${rank}`;
+  } else if (rows[0].profile_name !== name || rows[0].rank !== rank) {
     await sql`update profiles set name = ${name}, rank = ${rank} where user_id = ${userId}`;
-  } else {
-    await sql`insert into profiles (user_id, name, rank) values (${userId}, ${name}, ${rank})`;
   }
   return { userId, name, rank, founder: rank === "Founder" };
 }
@@ -36,52 +41,53 @@ export const loadBoard = createServerFn({ method: "GET" })
     const me = await actor(context.userId);
     const { getSql } = await import("@/lib/db");
     const sql = await getSql();
-    const ledger = me.founder
-      ? await sql<{
-          id: number;
-          entry_date: string;
-          kind: string;
-          category: string;
-          source: string;
-          amount: string;
-          notes: string;
-          external_id: string | null;
-        }>`select id, entry_date, kind, category, source, amount, notes, external_id from ledger order by entry_date desc, id desc`
-      : [];
-    const events = await sql<{
-      id: number;
-      name: string;
-      event_date: string;
-      event_time: string;
-      venue: string;
-      notes: string;
-    }>`select id, name, event_date, event_time, venue, notes from events order by event_date, event_time`;
-    const shifts = await sql<{
-      event_id: number;
-      user_id: string;
-      name: string;
-      role: string;
-      image: string | null;
-    }>`select s.event_id, s.user_id, s.name, s.role, u.image
-      from shifts s
-      left join "user" u on u.id = s.user_id
-      order by s.name`;
-    const gear = me.founder
-      ? await sql<{
-          id: number;
-          name: string;
-          qty: number;
-          unit_cost: string;
-          notes: string;
-        }>`select id, name, qty, unit_cost, notes from equipment order by id desc`
-      : [];
-    const humanitix = me.founder
-      ? ((await sql<{ note: string }>`select note from sync_state where key = 'humanitix'`)[0]?.note ??
-        "Waiting for the first Humanitix check.")
-      : "";
-    const crew = await sql<{ user_id: string; name: string; rank: string }>`
-      select user_id, name, rank from profiles order by rank, name
-    `;
+    const [ledger, events, shifts, gear, humanitixRows, crew] = await Promise.all([
+      me.founder
+        ? sql<{
+            id: number;
+            entry_date: string;
+            kind: string;
+            category: string;
+            source: string;
+            amount: string;
+            notes: string;
+            external_id: string | null;
+          }>`select id, entry_date, kind, category, source, amount, notes, external_id from ledger order by entry_date desc, id desc`
+        : Promise.resolve([]),
+      sql<{
+        id: number;
+        name: string;
+        event_date: string;
+        event_time: string;
+        venue: string;
+        notes: string;
+      }>`select id, name, event_date, event_time, venue, notes from events order by event_date, event_time`,
+      sql<{
+        event_id: number;
+        user_id: string;
+        name: string;
+        role: string;
+        image: string | null;
+      }>`select s.event_id, s.user_id, s.name, s.role, u.image
+        from shifts s
+        left join "user" u on u.id = s.user_id
+        order by s.name`,
+      me.founder
+        ? sql<{
+            id: number;
+            name: string;
+            qty: number;
+            unit_cost: string;
+            notes: string;
+          }>`select id, name, qty, unit_cost, notes from equipment order by id desc`
+        : Promise.resolve([]),
+      me.founder
+        ? sql<{ note: string }>`select note from sync_state where key = 'humanitix'`
+        : Promise.resolve([]),
+      sql<{ user_id: string; name: string; rank: string }>`
+        select user_id, name, rank from profiles order by rank, name
+      `,
+    ]);
     return {
       me,
       roles: WORK_ROLES,
@@ -90,7 +96,7 @@ export const loadBoard = createServerFn({ method: "GET" })
       shifts,
       gear: gear.map((r) => ({ ...r, unit_cost: num(r.unit_cost) })),
       crew,
-      humanitix,
+      humanitix: humanitixRows[0]?.note ?? (me.founder ? "Waiting for the first Humanitix check." : ""),
     };
   });
 
