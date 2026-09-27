@@ -85,6 +85,29 @@ function toSql(run: Run): Sql {
   return sql;
 }
 
+/** Neon adds `channel_binding=require`, which makes `pg` hang on Vercel. */
+export function normalizePostgresUrl(raw: string): string {
+  return raw
+    .replace(/([?&])channel_binding=[^&]*/g, "$1")
+    .replace(/\?&/g, "?")
+    .replace(/[?&]$/, "");
+}
+
+export function pgPoolOptions(connectionString: string): {
+  connectionString: string;
+  max: number;
+  connectionTimeoutMillis: number;
+  ssl?: { rejectUnauthorized: false };
+} {
+  const url = normalizePostgresUrl(connectionString);
+  const local = url.includes("localhost") || url.includes("127.0.0.1");
+  return {
+    connectionString: url,
+    max: 1,
+    connectionTimeoutMillis: 8000,
+    ssl: local ? undefined : { rejectUnauthorized: false },
+  };
+}
 function createNeonSql(): Promise<Sql> {
   globalRef.__pgSqlPromise__ ??= (async () => {
     // Regular Postgres driver: node-postgres (`pg`) — works directly with Neon's
@@ -93,7 +116,7 @@ function createNeonSql(): Promise<Sql> {
     types.setTypeParser(OID_INT8, Number);
     types.setTypeParser(OID_DATE, identity);
     types.setTypeParser(OID_INTERVAL, identity);
-    const pool = new Pool({ connectionString: databaseUrl });
+    const pool = new Pool(pgPoolOptions(databaseUrl!));
     return toSql(async <T>(text: string, params: unknown[]) => {
       const res = await pool.query(text, params);
       return res.rows as T[];
