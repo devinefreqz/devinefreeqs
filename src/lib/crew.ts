@@ -45,7 +45,8 @@ export const loadBoard = createServerFn({ method: "GET" })
           source: string;
           amount: string;
           notes: string;
-        }>`select id, entry_date, kind, category, source, amount, notes from ledger order by entry_date desc, id desc`
+          external_id: string | null;
+        }>`select id, entry_date, kind, category, source, amount, notes, external_id from ledger order by entry_date desc, id desc`
       : [];
     const events = await sql<{
       id: number;

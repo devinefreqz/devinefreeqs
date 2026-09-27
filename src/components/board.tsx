@@ -491,6 +491,9 @@ function Finance({
   expense: number;
   run: (action: () => Promise<unknown>) => Promise<void>;
 }) {
+  const tickets = board.ledger.filter((row) => (row.external_id ?? "").startsWith("humanitix:"));
+  const books = board.ledger.filter((row) => !(row.external_id ?? "").startsWith("humanitix:"));
+  const ticketTotal = tickets.reduce((sum, row) => sum + row.amount, 0);
   return (
     <section className="flex flex-col gap-4">
       <div className="grid gap-3 sm:grid-cols-3">
@@ -498,7 +501,43 @@ function Finance({
         <Stat label="In" value={money.format(income)} tone="good" />
         <Stat label="Out" value={money.format(expense)} tone="bad" />
       </div>
-      <p className="text-sm text-muted">{board.humanitix || "Ticket sales from Humanitix update on their own."}</p>
+      <div className="rounded-2xl border border-line bg-surface p-4">
+        <div className="flex flex-wrap items-end justify-between gap-3">
+          <h2 className="font-display text-xl">Humanitix sales</h2>
+          <p className="text-sm text-good">{money.format(ticketTotal)}</p>
+        </div>
+        <p className="mt-1 text-sm text-muted">{board.humanitix || "Ticket sales from Humanitix update on their own."}</p>
+        <div className="mt-3 overflow-x-auto">
+          <table className="w-full min-w-[32rem] text-left text-sm">
+            <thead className="text-xs tracking-widest text-muted uppercase">
+              <tr>
+                <th className="py-2 font-medium">Date</th>
+                <th className="py-2 font-medium">Event</th>
+                <th className="py-2 font-medium">Buyer</th>
+                <th className="py-2 font-medium">Amount</th>
+              </tr>
+            </thead>
+            <tbody>
+              {tickets.length ? (
+                tickets.map((row) => (
+                  <tr key={row.id} className="border-t border-line">
+                    <td className="py-2 pr-3">{show(row.entry_date)}</td>
+                    <td className="py-2 pr-3">{row.source}</td>
+                    <td className="py-2 pr-3 text-muted">{row.notes || "—"}</td>
+                    <td className="py-2 text-good">+{money.format(row.amount)}</td>
+                  </tr>
+                ))
+              ) : (
+                <tr>
+                  <td className="py-2 text-muted" colSpan={4}>
+                    No ticket sales yet
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
       {founder ? (
         <form
           className="grid gap-3 rounded-2xl border border-line bg-surface p-4 sm:grid-cols-2"
@@ -546,6 +585,7 @@ function Finance({
           </div>
         </form>
       ) : null}
+      <h2 className="font-display text-xl">Other money</h2>
       <div className="overflow-x-auto rounded-2xl border border-line">
         <table className="w-full min-w-[36rem] text-left text-sm">
           <thead className="text-xs tracking-widest text-muted uppercase">
@@ -557,7 +597,7 @@ function Finance({
             </tr>
           </thead>
           <tbody>
-            {board.ledger.map((row) => (
+            {books.map((row) => (
               <tr key={row.id} className="border-t border-line">
                 <td className="px-3 py-3">{show(row.entry_date)}</td>
                 <td className="px-3 py-3">
