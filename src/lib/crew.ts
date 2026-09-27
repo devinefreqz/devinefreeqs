@@ -74,6 +74,10 @@ export const loadBoard = createServerFn({ method: "GET" })
           notes: string;
         }>`select id, name, qty, unit_cost, notes from equipment order by id desc`
       : [];
+    const humanitix = me.founder
+      ? ((await sql<{ note: string }>`select note from sync_state where key = 'humanitix'`)[0]?.note ??
+        "Waiting for the first Humanitix check.")
+      : "";
     const crew = await sql<{ user_id: string; name: string; rank: string }>`
       select user_id, name, rank from profiles order by rank, name
     `;
@@ -85,7 +89,16 @@ export const loadBoard = createServerFn({ method: "GET" })
       shifts,
       gear: gear.map((r) => ({ ...r, unit_cost: num(r.unit_cost) })),
       crew,
+      humanitix,
     };
+  });
+
+export const syncTickets = createServerFn({ method: "POST" })
+  .middleware([authMiddleware])
+  .handler(async () => {
+    const { syncHumanitix } = await import("@/lib/humanitix");
+    await syncHumanitix();
+    return { ok: true };
   });
 
 export const addLedger = createServerFn({ method: "POST" })
