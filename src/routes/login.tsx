@@ -17,10 +17,17 @@ function Login() {
     const name = String(form.get("name") ?? "").trim();
     setBusy(true);
     setError("");
-    const result =
+    const result = await Promise.race([
       mode === "up"
-        ? await authClient.signUp.email({ email, password, name, callbackURL: "/" })
-        : await authClient.signIn.email({ email, password, callbackURL: "/" });
+        ? authClient.signUp.email({ email, password, name, callbackURL: "/" })
+        : authClient.signIn.email({ email, password, callbackURL: "/" }),
+      new Promise<never>((_, reject) => {
+        window.setTimeout(() => reject(new Error("The server did not answer. Refresh the page and try once more.")), 20000);
+      }),
+    ]).catch((error: unknown) => {
+      const message = error instanceof Error ? error.message : "Sign-in failed";
+      return { data: null, error: { message } };
+    });
     setBusy(false);
     if (result.error) {
       setError(result.error.message ?? "Sign-in failed");
