@@ -1,4 +1,7 @@
+import { neonConfig, Pool as NeonPool } from "@neondatabase/serverless";
 import { pendingMigrations } from "../../scripts/migration-plan.mjs";
+
+neonConfig.poolQueryViaFetch = true;
 
 /** Which database backend is active. */
 export type DbSource = "neon" | "pglite";
@@ -93,30 +96,14 @@ export function normalizePostgresUrl(raw: string): string {
     .replace(/[?&]$/, "");
 }
 
-export function pgPoolOptions(connectionString: string): {
-  connectionString: string;
-  max: number;
-  connectionTimeoutMillis: number;
-  ssl?: { rejectUnauthorized: false };
-} {
-  const url = normalizePostgresUrl(connectionString);
-  const local = url.includes("localhost") || url.includes("127.0.0.1");
-  return {
-    connectionString: url,
-    max: 1,
-    connectionTimeoutMillis: 8000,
-    ssl: local ? undefined : { rejectUnauthorized: false },
-  };
+export function createNeonPool(connectionString: string) {
+  return new NeonPool({ connectionString: normalizePostgresUrl(connectionString) });
 }
 function createNeonSql(): Promise<Sql> {
   globalRef.__pgSqlPromise__ ??= (async () => {
     // Regular Postgres driver: node-postgres (`pg`) — works directly with Neon's
     // pooled endpoint. One pool per process; warm serverless instances reuse it.
-    const { Pool, types } = await import("pg");
-    types.setTypeParser(OID_INT8, Number);
-    types.setTypeParser(OID_DATE, identity);
-    types.setTypeParser(OID_INTERVAL, identity);
-    const pool = new Pool(pgPoolOptions(databaseUrl!));
+    const pool = createNeonPool(databaseUrl!);
     return toSql(async <T>(text: string, params: unknown[]) => {
       const res = await pool.query(text, params);
       return res.rows as T[];
