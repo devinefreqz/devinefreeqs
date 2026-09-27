@@ -1,0 +1,5 @@
+- Devine Frequencies crew dashboard prototype saved at artifacts/dashboard/ [2026-09-26]
+- Ranks: Founder (full edit) and Crew Member (view only) [2026-09-26]
+- Finance ledger is localStorage-first; tickets/equipment/payroll reserved for a future payment platform hook [2026-09-26]
+- Events page: Founder creates events; any member signs on as Security, Medical, Door sales, Production, or Bar [2026-09-26]
+- Demo logins: founder/founder123 and crew/crew123 [2026-09-26]
