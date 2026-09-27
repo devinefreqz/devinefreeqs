@@ -12,9 +12,13 @@ function Login() {
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
-    const email = String(form.get("email") ?? "").trim();
+    const email = String(form.get("email") ?? "").trim().toLowerCase();
     const password = String(form.get("password") ?? "");
-    const name = String(form.get("name") ?? "").trim();
+    const name = String(form.get("username") ?? "").trim();
+    if (mode === "up" && !/^[a-zA-Z0-9][a-zA-Z0-9 .'-]{1,31}$/.test(name)) {
+      setError("Username needs 2–32 letters or numbers.");
+      return;
+    }
     setBusy(true);
     setError("");
     const result = await Promise.race([
@@ -50,18 +54,21 @@ function Login() {
         <img src="/logo.jpg" alt="" className="mx-auto mb-4 h-20 w-20 object-contain invert" />
         <h1 className="text-center font-display text-xl tracking-widest">DEVINE FREQUENCIES</h1>
         <p className="mt-2 text-center text-sm text-muted">
-          Create one account for Darcy and one for Sage. Use those names and both get Founder access.
+          Crew members create an account with a username, email, and password. You can view the board. Darcy and Sage are Founders.
         </p>
         {authEnabled ? (
           <>
             <form className="mt-6 flex flex-col gap-3" onSubmit={onSubmit}>
               {mode === "up" ? (
                 <label className="text-xs tracking-widest text-muted uppercase">
-                  Name
+                  Username
                   <input
-                    name="name"
+                    name="username"
                     required
-                    placeholder="Darcy or Sage"
+                    minLength={2}
+                    maxLength={32}
+                    autoComplete="username"
+                    placeholder="Your name on the crew list"
                     className="mt-1 min-h-11 w-full rounded-xl border border-line bg-bg px-3 text-sm text-fg normal-case"
                   />
                 </label>
@@ -89,7 +96,7 @@ function Login() {
               </label>
               {error ? <p className="text-sm text-bad">{error}</p> : null}
               <button type="submit" disabled={busy} className="min-h-11 rounded-xl bg-fg text-sm font-semibold text-ink">
-                {busy ? "Working…" : mode === "up" ? "Create account" : "Sign in"}
+                {busy ? "Working…" : mode === "up" ? "Create crew account" : "Sign in"}
               </button>
             </form>
             <button

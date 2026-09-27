@@ -444,7 +444,7 @@ function CrewList({ crew }: { crew: { user_id: string; name: string; rank: strin
   return (
     <section className="rounded-2xl border border-line bg-surface">
       <p className="border-b border-line px-4 py-3 text-sm text-muted">
-        Darcy and Sage are Founders when they sign up with that name. Anyone else joins as Crew Member.
+        Anyone can join with a username, email, and password. Darcy and Sage are Founders. Everyone else is a Crew Member and can view the board.
       </p>
       <ul>
         {crew.map((person) => (
