@@ -1,19 +1,10 @@
 import { useEffect, useRef, useState } from "react";
 import { UserButton } from "@/lib/auth/gates";
-import { roleColor } from "@/lib/role-colors";
 import {
-  addEquipment,
-  addEvent,
-  addLedger,
-  clearShift,
-  deleteEquipment,
-  deleteEvent,
-  deleteLedger,
-  dropRole,
   loadBoard,
-  setShift,
-  type Rank,
 } from "@/lib/crew";
+import { Events } from "./board-events";
+import { CrewList, Finance, Gear, Overview } from "./board-panels";
 
 type Board = Awaited<ReturnType<typeof loadBoard>>;
 type View = "overview" | "events" | "finance" | "equipment" | "crew";
@@ -25,13 +16,6 @@ const NAV: { id: View; label: string }[] = [
   { id: "equipment", label: "Equipment" },
   { id: "crew", label: "Crew" },
 ];
-
-const money = new Intl.NumberFormat("en-AU", { style: "currency", currency: "AUD" });
-
-function show(value: unknown) {
-  if (value instanceof Date) return value.toISOString().slice(0, 10);
-  return value == null ? "" : String(value);
-}
 
 export function Board() {
   const [board, setBoard] = useState<Board | null>(null);
