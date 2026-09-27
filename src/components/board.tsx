@@ -216,18 +216,8 @@ function Events({
                 </button>
               ) : null}
             </div>
-            <div className="mt-3 flex flex-wrap gap-2">
-              {roster.length ? (
-                roster.map((s) => (
-                  <span key={s.user_id} className="rounded-full border border-line px-3 py-1 text-xs">
-                    {s.name} — {s.role}
-                  </span>
-                ))
-              ) : (
-                <span className="text-sm text-muted">Nobody signed yet</span>
-              )}
-            </div>
-            <div className="mt-3 flex flex-wrap gap-2">
+            <p className="mt-4 text-xs tracking-widest text-muted uppercase">Working this night</p>
+            <div className="mt-2 flex flex-wrap gap-2">
               {board.roles.map((role) => (
                 <button
                   key={role}
@@ -252,6 +242,27 @@ function Events({
                   Not working
                 </button>
               ) : null}
+            </div>
+            <div className="mt-4 flex flex-wrap gap-3 border-t border-line pt-3">
+              {roster.length ? (
+                roster.map((s) => (
+                  <div key={s.user_id} className="group relative" title={s.name}>
+                    {s.image ? (
+                      <img src={s.image} alt={s.name} className="h-11 w-11 rounded-full object-cover" />
+                    ) : (
+                      <span className="grid h-11 w-11 place-items-center rounded-full bg-black/10 text-sm font-medium">
+                        {(s.name || "?").charAt(0).toUpperCase()}
+                      </span>
+                    )}
+                    <span className="pointer-events-none absolute bottom-full left-1/2 z-10 mb-1 -translate-x-1/2 whitespace-nowrap rounded-md bg-fg px-2 py-1 text-xs text-ink opacity-0 group-hover:opacity-100">
+                      {s.name}
+                    </span>
+                    <p className="mt-1 max-w-16 truncate text-center text-[10px] text-muted">{s.role}</p>
+                  </div>
+                ))
+              ) : (
+                <span className="text-sm text-muted">Nobody signed yet</span>
+              )}
             </div>
           </article>
         );

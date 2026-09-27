@@ -58,7 +58,11 @@ export const loadBoard = createServerFn({ method: "GET" })
       user_id: string;
       name: string;
       role: string;
-    }>`select event_id, user_id, name, role from shifts order by name`;
+      image: string | null;
+    }>`select s.event_id, s.user_id, s.name, s.role, u.image
+      from shifts s
+      left join "user" u on u.id = s.user_id
+      order by s.name`;
     const gear = await sql<{
       id: number;
       name: string;
