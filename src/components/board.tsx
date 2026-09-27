@@ -68,6 +68,8 @@ export function Board() {
   }
 
   const founder = board.me.founder;
+  const nav = founder ? NAV : NAV.filter((item) => item.id === "events" || item.id === "crew");
+  const shown = nav.some((item) => item.id === view) ? view : "events";
   const income = board.ledger.filter((r) => r.kind === "income").reduce((s, r) => s + r.amount, 0);
   const expense = board.ledger.filter((r) => r.kind === "expense").reduce((s, r) => s + r.amount, 0);
   const gearValue = board.gear.reduce((s, g) => s + g.qty * g.unit_cost, 0);
@@ -85,13 +87,13 @@ export function Board() {
         <UserButton />
       </header>
       <nav className="flex gap-2 overflow-x-auto border-b border-line px-4 py-3">
-        {NAV.map((item) => (
+        {nav.map((item) => (
           <button
             key={item.id}
             type="button"
             onClick={() => setView(item.id)}
             className={
-              view === item.id
+              shown === item.id
                 ? "min-h-11 shrink-0 rounded-full bg-fg px-4 text-sm font-medium text-ink"
                 : "min-h-11 shrink-0 rounded-full border border-line px-4 text-sm text-fg"
             }
@@ -102,18 +104,13 @@ export function Board() {
       </nav>
       <main className="mx-auto flex max-w-5xl flex-col gap-4 px-4 py-5">
         {error ? <p className="text-sm text-bad">{error}</p> : null}
-        {!founder ? (
-          <p className="rounded-xl border border-line bg-surface px-4 py-3 text-sm text-muted">
-            Crew can view the books and mark their own shifts. Founders edit everything.
-          </p>
-        ) : null}
-        {view === "overview" ? (
+        {shown === "overview" && founder ? (
           <Overview income={income} expense={expense} events={board.events.length} gear={board.gear.length} />
         ) : null}
-        {view === "events" ? <Events board={board} founder={founder} run={run} /> : null}
-        {view === "finance" ? <Finance board={board} founder={founder} income={income} expense={expense} run={run} /> : null}
-        {view === "equipment" ? <Gear board={board} founder={founder} total={gearValue} run={run} /> : null}
-        {view === "crew" ? <CrewList crew={board.crew} /> : null}
+        {shown === "events" ? <Events board={board} founder={founder} run={run} /> : null}
+        {shown === "finance" && founder ? <Finance board={board} founder={founder} income={income} expense={expense} run={run} /> : null}
+        {shown === "equipment" && founder ? <Gear board={board} founder={founder} total={gearValue} run={run} /> : null}
+        {shown === "crew" ? <CrewList crew={board.crew} /> : null}
       </main>
     </div>
   );

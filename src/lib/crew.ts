@@ -36,15 +36,17 @@ export const loadBoard = createServerFn({ method: "GET" })
     const me = await actor(context.userId);
     const { getSql } = await import("@/lib/db");
     const sql = await getSql();
-    const ledger = await sql<{
-      id: number;
-      entry_date: string;
-      kind: string;
-      category: string;
-      source: string;
-      amount: string;
-      notes: string;
-    }>`select id, entry_date, kind, category, source, amount, notes from ledger order by entry_date desc, id desc`;
+    const ledger = me.founder
+      ? await sql<{
+          id: number;
+          entry_date: string;
+          kind: string;
+          category: string;
+          source: string;
+          amount: string;
+          notes: string;
+        }>`select id, entry_date, kind, category, source, amount, notes from ledger order by entry_date desc, id desc`
+      : [];
     const events = await sql<{
       id: number;
       name: string;
@@ -63,13 +65,15 @@ export const loadBoard = createServerFn({ method: "GET" })
       from shifts s
       left join "user" u on u.id = s.user_id
       order by s.name`;
-    const gear = await sql<{
-      id: number;
-      name: string;
-      qty: number;
-      unit_cost: string;
-      notes: string;
-    }>`select id, name, qty, unit_cost, notes from equipment order by id desc`;
+    const gear = me.founder
+      ? await sql<{
+          id: number;
+          name: string;
+          qty: number;
+          unit_cost: string;
+          notes: string;
+        }>`select id, name, qty, unit_cost, notes from equipment order by id desc`
+      : [];
     const crew = await sql<{ user_id: string; name: string; rank: string }>`
       select user_id, name, rank from profiles order by rank, name
     `;
