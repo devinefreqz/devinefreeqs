@@ -39,26 +39,27 @@ export function Board() {
   const [error, setError] = useState("");
   const [view, setView] = useState<View>("overview");
   const pull = useRef(0);
+  const seen = useRef<Board | null>(null);
 
   async function refresh(quiet = false) {
     const ticket = ++pull.current;
     try {
       const next = await loadBoard();
-      if (ticket !== pull.current) return;
+      if (ticket !== pull.current && seen.current) return;
+      seen.current = next;
       setBoard(next);
       setError("");
     } catch (err) {
-      if (ticket !== pull.current || quiet) return;
+      if ((ticket !== pull.current || quiet) && seen.current) return;
       setError(err instanceof Error ? err.message : "Could not load the board");
     }
   }
 
   useEffect(() => {
-    void refresh();
-    const id = window.setInterval(() => {
-      if (document.visibilityState === "visible") void refresh(true);
-    }, 3000);
-    const onVisible = () => {
+    let stop = false;
+    let timer = 0;
+    let tickets = 0;
+    const tick = () => {
       if (document.visibilityState === "visible") void refresh(true);
     };
     const pullTickets = () => {
@@ -67,13 +68,18 @@ export function Board() {
         .then(() => refresh(true))
         .catch(() => undefined);
     };
-    const tickets = window.setInterval(pullTickets, 60000);
-    pullTickets();
-    document.addEventListener("visibilitychange", onVisible);
+    void refresh().finally(() => {
+      if (stop) return;
+      timer = window.setInterval(tick, 3000);
+      tickets = window.setInterval(pullTickets, 60000);
+      pullTickets();
+    });
+    document.addEventListener("visibilitychange", tick);
     return () => {
-      window.clearInterval(id);
+      stop = true;
+      window.clearInterval(timer);
       window.clearInterval(tickets);
-      document.removeEventListener("visibilitychange", onVisible);
+      document.removeEventListener("visibilitychange", tick);
     };
   }, []);
 
