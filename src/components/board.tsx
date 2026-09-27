@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { UserButton } from "@/lib/auth/gates";
 import { roleColor } from "@/lib/role-colors";
 import {
   addEquipment,
