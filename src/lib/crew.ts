@@ -1,21 +1,23 @@
 import { createServerFn } from "@tanstack/react-start";
 import { authMiddleware } from "@/lib/auth/middleware";
 
-const WORK_ROLES = ["Security", "Medical", "Door sales", "Production", "Bar"] as const;
+const FOUNDER_EMAILS = new Set(["divinefrequencies42@gmail.com", "darcygray10@hotmail.com"]);
 
 export type Rank = "Founder" | "Crew Member";
 
 type Actor = { userId: string; name: string; rank: Rank; founder: boolean };
 
+const WORK_ROLES = ["Security", "Medical", "Door sales", "Production", "Bar"] as const;
+
 async function actor(userId: string): Promise<Actor> {
   const { getSql } = await import("@/lib/db");
   const sql = await getSql();
-  const users = await sql<{ name: string }>`select name from "user" where id = ${userId}`;
+  const users = await sql<{ name: string; email: string }>`select name, email from "user" where id = ${userId}`;
   const name = users[0]?.name?.trim() || "Crew";
+  const founderEmail = FOUNDER_EMAILS.has((users[0]?.email ?? "").trim().toLowerCase());
   const existing = await sql<{ rank: string }>`select rank from profiles where user_id = ${userId}`;
-  let rank: Rank = "Crew Member";
+  const rank: Rank = founderEmail || existing[0]?.rank === "Founder" ? "Founder" : "Crew Member";
   if (existing[0]) {
-    rank = existing[0].rank === "Founder" ? "Founder" : "Crew Member";
     await sql`update profiles set name = ${name}, rank = ${rank} where user_id = ${userId}`;
   } else {
     await sql`insert into profiles (user_id, name, rank) values (${userId}, ${name}, ${rank})`;
