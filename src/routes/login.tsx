@@ -57,9 +57,6 @@ function Login() {
       <div className="w-full max-w-sm rounded-3xl border border-line bg-surface p-6">
         <img src="/logo.jpg" alt="" className="mx-auto mb-4 h-20 w-20 object-contain invert" />
         <h1 className="text-center font-display text-xl tracking-widest">DEVINE FREQUENCIES</h1>
-        <p className="mt-2 text-center text-sm text-muted">
-          Crew members create an account with a username, email, and password. Darcy and Sage are reserved usernames.
-        </p>
         {authEnabled ? (
           <>
             <form className="mt-6 flex flex-col gap-3" onSubmit={onSubmit}>
@@ -72,7 +69,6 @@ function Login() {
                     minLength={2}
                     maxLength={32}
                     autoComplete="username"
-                    placeholder="Your name on the crew list"
                     className="mt-1 min-h-11 w-full rounded-xl border border-line bg-bg px-3 text-sm text-fg normal-case"
                   />
                 </label>
