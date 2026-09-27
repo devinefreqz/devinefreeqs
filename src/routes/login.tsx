@@ -59,7 +59,7 @@ function Login() {
         <h1 className="text-center font-display text-xl tracking-widest">DEVINE FREQUENCIES</h1>
         {authEnabled ? (
           <>
-            <form className="mt-6 flex flex-col gap-3" onSubmit={onSubmit}>
+            <form className="mt-6 flex flex-col gap-3" data-crew-login="1" onSubmit={onSubmit}>
               {mode === "up" ? (
                 <label className="text-xs tracking-widest text-muted uppercase">
                   Username
