@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { UserButton } from "@/lib/auth/gates";
 import { roleColor } from "@/lib/role-colors";
 import {
@@ -37,18 +37,34 @@ export function Board() {
   const [board, setBoard] = useState<Board | null>(null);
   const [error, setError] = useState("");
   const [view, setView] = useState<View>("overview");
+  const pull = useRef(0);
 
-  async function refresh() {
+  async function refresh(quiet = false) {
+    const ticket = ++pull.current;
     try {
-      setBoard(await loadBoard());
+      const next = await loadBoard();
+      if (ticket !== pull.current) return;
+      setBoard(next);
       setError("");
     } catch (err) {
+      if (ticket !== pull.current || quiet) return;
       setError(err instanceof Error ? err.message : "Could not load the board");
     }
   }
 
   useEffect(() => {
     void refresh();
+    const id = window.setInterval(() => {
+      if (document.visibilityState === "visible") void refresh(true);
+    }, 3000);
+    const onVisible = () => {
+      if (document.visibilityState === "visible") void refresh(true);
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      window.clearInterval(id);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
   }, []);
 
   async function run(action: () => Promise<unknown>) {
