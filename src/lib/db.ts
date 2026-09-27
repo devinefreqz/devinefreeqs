@@ -116,6 +116,24 @@ export function createNeonPool(connectionString: string) {
     end: async () => {},
   };
 }
+function plainCell(value: unknown): unknown {
+  if (value instanceof Date) {
+    const iso = value.toISOString();
+    return iso.endsWith("T00:00:00.000Z") ? iso.slice(0, 10) : iso;
+  }
+  if (typeof value === "bigint") return Number(value);
+  return value;
+}
+
+function plainRows<T>(rows: T[]): T[] {
+  return rows.map((row) => {
+    if (!row || typeof row !== "object") return row;
+    const out: Record<string, unknown> = {};
+    for (const [key, value] of Object.entries(row)) out[key] = plainCell(value);
+    return out as T;
+  });
+}
+
 function createNeonSql(): Promise<Sql> {
   globalRef.__pgSqlPromise__ ??= (async () => {
     // Regular Postgres driver: node-postgres (`pg`) — works directly with Neon's
@@ -123,7 +141,7 @@ function createNeonSql(): Promise<Sql> {
     const pool = createNeonPool(databaseUrl!);
     return toSql(async <T>(text: string, params: unknown[]) => {
       const res = await pool.query(text, params);
-      return res.rows as T[];
+      return plainRows(res.rows as T[]);
     });
   })().catch((err) => {
     globalRef.__pgSqlPromise__ = undefined;

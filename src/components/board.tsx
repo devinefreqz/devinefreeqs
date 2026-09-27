@@ -26,6 +26,11 @@ const NAV: { id: View; label: string }[] = [
 
 const money = new Intl.NumberFormat("en-AU", { style: "currency", currency: "AUD" });
 
+function show(value: unknown) {
+  if (value instanceof Date) return value.toISOString().slice(0, 10);
+  return value == null ? "" : String(value);
+}
+
 export function Board() {
   const [board, setBoard] = useState<Board | null>(null);
   const [error, setError] = useState("");
@@ -197,7 +202,7 @@ function Events({
               <div>
                 <h2 className="font-display text-xl">{ev.name}</h2>
                 <p className="text-sm text-muted">
-                  {ev.event_date} · {ev.event_time} · {ev.venue}
+                  {show(ev.event_date)} · {show(ev.event_time)} · {ev.venue}
                 </p>
                 {ev.notes ? <p className="mt-1 text-sm text-muted">{ev.notes}</p> : null}
               </div>
@@ -335,7 +340,7 @@ function Finance({
           <tbody>
             {board.ledger.map((row) => (
               <tr key={row.id} className="border-t border-line">
-                <td className="px-3 py-3">{row.entry_date}</td>
+                <td className="px-3 py-3">{show(row.entry_date)}</td>
                 <td className="px-3 py-3">
                   {row.source}
                   <span className="block text-xs text-muted">
