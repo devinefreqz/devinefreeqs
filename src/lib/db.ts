@@ -96,7 +96,16 @@ export function normalizePostgresUrl(raw: string): string {
 
 export function createNeonPool(connectionString: string) {
   const sql = neon(normalizePostgresUrl(connectionString), { fullResults: true });
-  const query = async (text: string, params?: unknown[]) => sql.query(text, params ?? []);
+  const query = async (text: string, params?: unknown[]) => {
+    try {
+      return await sql.query(text, params ?? [], {
+        fetchOptions: { signal: AbortSignal.timeout(8000) },
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Database request failed";
+      throw new Error(message);
+    }
+  };
   const client = {
     query,
     release() {},

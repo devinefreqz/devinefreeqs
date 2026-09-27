@@ -22,7 +22,7 @@ function Login() {
         ? authClient.signUp.email({ email, password, name, callbackURL: "/" })
         : authClient.signIn.email({ email, password, callbackURL: "/" }),
       new Promise<never>((_, reject) => {
-        window.setTimeout(() => reject(new Error("The server did not answer. Refresh the page and try once more.")), 20000);
+        window.setTimeout(() => reject(new Error("Could not reach the crew database. Try again in a minute.")), 12000);
       }),
     ]).catch((error: unknown) => {
       const message = error instanceof Error ? error.message : "Sign-in failed";
