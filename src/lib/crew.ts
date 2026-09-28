@@ -41,7 +41,7 @@ export const loadBoard = createServerFn({ method: "GET" })
     const me = await actor(context.userId);
     const { getSql } = await import("@/lib/db");
     const sql = await getSql();
-    const [ledger, events, shifts, gear, humanitixRows, crew] = await Promise.all([
+    const [ledger, events, shifts, gear, humanitixRows, crew, opsRows] = await Promise.all([
       me.founder
         ? sql<{
             id: number;
@@ -87,6 +87,7 @@ export const loadBoard = createServerFn({ method: "GET" })
       sql<{ user_id: string; name: string; rank: string }>`
         select user_id, name, rank from profiles order by rank, name
       `,
+      sql<{ note: string }>`select note from sync_state where key = 'ops'`,
     ]);
     return {
       me,
@@ -97,6 +98,7 @@ export const loadBoard = createServerFn({ method: "GET" })
       gear: gear.map((r) => ({ ...r, unit_cost: num(r.unit_cost) })),
       crew,
       humanitix: humanitixRows[0]?.note ?? (me.founder ? "Waiting for the first Humanitix check." : ""),
+      ops: (await import("@/lib/ops")).parseOps(opsRows[0]?.note),
     };
   });
 
