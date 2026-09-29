@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import {
   addEquipment,
   addLedger,
@@ -157,20 +157,36 @@ export function Gear({
   run: (action: () => Promise<unknown>) => Promise<void>;
 }) {
   const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState("");
+  const [name, setName] = useState("");
+  const [picked, setPicked] = useState(false);
+  const known = useMemo(() => {
+    const seen = new Map<string, number>();
+    board.gear.forEach((item) => {
+      const key = item.name.trim();
+      if (!key) return;
+      if (!seen.has(key.toLowerCase())) seen.set(key.toLowerCase(), item.unit_cost);
+    });
+    return [...seen.entries()]
+      .map(([key, cost]) => {
+        const label = board.gear.find((item) => item.name.trim().toLowerCase() === key)?.name || key;
+        return { label, cost };
+      })
+      .sort((a, b) => a.label.localeCompare(b.label));
+  }, [board.gear]);
+  const matches = known.filter((item) => item.label.toLowerCase().includes(name.trim().toLowerCase()));
+  const list = board.gear.filter((item) => item.name.toLowerCase().includes(query.trim().toLowerCase()));
   return (
     <section className="flex flex-col gap-4">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <Stat label="Kit value" value={money.format(total)} />
         {founder ? (
-          <button
-            type="button"
-            className="min-h-11 rounded-xl bg-fg px-4 text-sm font-semibold text-ink"
-            onClick={() => setOpen((v) => !v)}
-          >
+          <button type="button" className="min-h-11 rounded-xl bg-fg px-4 text-sm font-semibold text-ink" onClick={() => setOpen((v) => !v)}>
             Add equipment
           </button>
         ) : null}
       </div>
+      <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search kit" className="min-h-11 rounded-xl border border-line bg-surface px-3 text-sm" />
       {open && founder ? (
         <form
           className="grid gap-3 rounded-2xl border border-line bg-surface p-4 sm:grid-cols-3"
@@ -181,17 +197,54 @@ export function Gear({
               addEquipment({
                 data: {
                   qty: Number(form.get("qty")),
-                  name: String(form.get("name") ?? ""),
+                  name: name.trim() || String(form.get("name") ?? ""),
                   unitCost: Number(form.get("unitCost")),
                 },
               }),
             );
             e.currentTarget.reset();
+            setName("");
+            setPicked(false);
             setOpen(false);
           }}
         >
           <Field name="qty" label="Qty" type="number" />
-          <Field name="name" label="Item" placeholder="15 inch PA speaker" />
+          <label className="relative flex flex-col gap-1 text-xs tracking-widest text-muted uppercase">
+            Item
+            <input
+              name="name"
+              value={name}
+              autoComplete="off"
+              placeholder="15 inch PA speaker"
+              required
+              className="min-h-11 rounded-xl border border-line bg-bg px-3 text-sm text-fg normal-case placeholder:text-muted"
+              onChange={(e) => {
+                setName(e.target.value);
+                setPicked(false);
+              }}
+            />
+            {name.trim() && !picked && matches.length ? (
+              <ul className="absolute top-full z-20 mt-1 max-h-48 w-full overflow-auto rounded-xl border border-line bg-surface text-sm normal-case shadow-lg">
+                {matches.map((item) => (
+                  <li key={item.label}>
+                    <button
+                      type="button"
+                      className="flex w-full items-center justify-between px-3 py-2 text-left hover:bg-black/20"
+                      onClick={() => {
+                        setName(item.label);
+                        setPicked(true);
+                        const cost = document.querySelector<HTMLInputElement>('input[name="unitCost"]');
+                        if (cost && item.cost) cost.value = String(item.cost);
+                      }}
+                    >
+                      <span>{item.label}</span>
+                      <span className="text-muted">{money.format(item.cost)}</span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            ) : null}
+          </label>
           <Field name="unitCost" label="Each AUD" type="number" placeholder="300" />
           <div className="sm:col-span-3">
             <button type="submit" className="min-h-11 rounded-xl bg-fg px-4 text-sm font-semibold text-ink">
@@ -201,7 +254,7 @@ export function Gear({
         </form>
       ) : null}
       <ul className="flex flex-col gap-2">
-        {board.gear.map((item) => (
+        {list.map((item) => (
           <li key={item.id} className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-line bg-surface px-4 py-3">
             <div>
               <p className="font-medium">
@@ -218,6 +271,7 @@ export function Gear({
             ) : null}
           </li>
         ))}
+        {!list.length ? <li className="text-sm text-muted">No kit matches that search.</li> : null}
       </ul>
     </section>
   );
