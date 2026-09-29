@@ -1,5 +1,7 @@
+import { useState } from "react";
 import { saveOps, type Ops } from "@/lib/ops";
 import { loadBoard } from "@/lib/crew";
+import { useCurrentUser } from "@/lib/auth/use-current-user";
 
 type Board = Awaited<ReturnType<typeof loadBoard>>;
 type Save = (action: () => Promise<unknown>, patch?: (board: Board) => Board) => Promise<void>;
@@ -21,6 +23,20 @@ function patchOps(board: Board, next: Ops): Board {
 }
 function persist(board: Board, ops: Ops, run: Save) {
   void run(() => saveOps({ data: ops }), (cur) => patchOps(cur, ops));
+}
+function stamp(value?: string) {
+  if (!value) return "";
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return value;
+  return d.toLocaleTimeString("en-AU", { hour: "numeric", minute: "2-digit" });
+}
+function Face({ name, image }: { name: string; image?: string | null }) {
+  if (image) return <img src={image} alt={name} title={name} className="h-10 w-10 rounded-full object-cover" />;
+  return (
+    <span title={name} className="grid h-10 w-10 place-items-center rounded-full bg-black/20 text-sm font-medium">
+      {(name || "?").charAt(0).toUpperCase()}
+    </span>
+  );
 }
 
 export function NextShift({ board }: { board: Board }) {
@@ -54,29 +70,57 @@ export function CoverageGaps({ board }: { board: Board }) {
 }
 
 export function RunSheet({ board, founder, run }: { board: Board; founder: boolean; run: Save }) {
-  const eventId = board.events[0]?.id ?? 0;
-  const rows = board.ops.run.filter((r) => r.eventId === eventId);
+  const [open, setOpen] = useState<number | null>(board.events[0]?.id ?? null);
+  if (!board.events.length) return <p className={`${card} text-sm text-muted`}>Add an event first, then drop its run sheet from the listing.</p>;
   return (
-    <section className="flex flex-col gap-4">
-      <div className={card}>
-        {rows.map((r) => (
-          <p key={r.id} className="border-b border-line py-3 text-sm last:border-0">{r.time} · {r.title} · {r.lead}</p>
-        ))}
-        {!rows.length ? <p className="text-sm text-muted">No cues yet. Founders add them below.</p> : null}
-        {founder ? (
-          <form className="mt-4 grid gap-3 sm:grid-cols-2" onSubmit={(e) => {
-            e.preventDefault();
-            const f = new FormData(e.currentTarget);
-            persist(board, { ...board.ops, run: [...board.ops.run, { id: uid("rs"), eventId, time: String(f.get("time")), title: String(f.get("title")), lead: String(f.get("lead") || ""), channel: String(f.get("channel") || ""), notes: "" }] }, run);
-            e.currentTarget.reset();
-          }}>
-            <input name="time" type="time" required className={field} />
-            <input name="title" placeholder="Cue" required className={field} />
-            <input name="lead" placeholder="Lead" className={field} />
-            <button type="submit" className={btn}>Add cue</button>
-          </form>
-        ) : null}
-      </div>
+    <section className="flex flex-col gap-3">
+      <p className="text-sm text-muted">{founder ? "Open a night to edit its cues. Each event keeps its own sheet." : "Open a night to view its cues."}</p>
+      {board.events.map((ev) => {
+        const rows = board.ops.run.filter((r) => r.eventId === ev.id).slice().sort((a, b) => a.time.localeCompare(b.time));
+        const shown = open === ev.id;
+        return (
+          <article key={ev.id} className={card}>
+            <button type="button" className="flex w-full items-center justify-between gap-3 text-left" onClick={() => setOpen(shown ? null : ev.id)} aria-expanded={shown}>
+              <div>
+                <h3 className="font-display text-lg">{ev.name}</h3>
+                <p className="text-sm text-muted">{String(ev.event_date).slice(0, 10)} · {ev.event_time} · {ev.venue} · {rows.length} cues</p>
+              </div>
+              <span className="grid h-10 w-10 place-items-center rounded-full border border-line text-lg" aria-hidden>
+                {shown ? "▾" : "▸"}
+              </span>
+            </button>
+            {shown ? (
+              <div className="mt-4 border-t border-line pt-3">
+                {rows.map((r) => (
+                  <div key={r.id} className="flex items-start justify-between gap-3 border-b border-line py-3 last:border-0">
+                    <p className="text-sm">{r.time} · {r.title}{r.lead ? ` · ${r.lead}` : ""}{r.channel ? ` · ${r.channel}` : ""}</p>
+                    {founder ? (
+                      <button type="button" className="text-sm text-bad" onClick={() => persist(board, { ...board.ops, run: board.ops.run.filter((x) => x.id !== r.id) }, run)}>
+                        Remove
+                      </button>
+                    ) : null}
+                  </div>
+                ))}
+                {!rows.length ? <p className="text-sm text-muted">No cues on this night yet.</p> : null}
+                {founder ? (
+                  <form className="mt-4 grid gap-3 sm:grid-cols-2" onSubmit={(e) => {
+                    e.preventDefault();
+                    const f = new FormData(e.currentTarget);
+                    persist(board, { ...board.ops, run: [...board.ops.run, { id: uid("rs"), eventId: ev.id, time: String(f.get("time")), title: String(f.get("title")), lead: String(f.get("lead") || ""), channel: String(f.get("channel") || ""), notes: String(f.get("notes") || "") }] }, run);
+                    e.currentTarget.reset();
+                  }}>
+                    <input name="time" type="time" required className={field} />
+                    <input name="title" placeholder="Cue" required className={field} />
+                    <input name="lead" placeholder="Lead" className={field} />
+                    <input name="channel" placeholder="Channel" className={field} />
+                    <button type="submit" className={btn}>Add cue</button>
+                  </form>
+                ) : null}
+              </div>
+            ) : null}
+          </article>
+        );
+      })}
     </section>
   );
 }
@@ -111,6 +155,16 @@ export function Safety({ board, founder, run }: { board: Board; founder: boolean
 }
 
 export function Comms({ board, founder, run }: { board: Board; founder: boolean; run: Save }) {
+  const me = useCurrentUser();
+  function person(userId: string) {
+    const fromCrew = board.crew.find((c) => c.user_id === userId) as { user_id: string; name: string; image?: string | null } | undefined;
+    const fromShift = board.shifts.find((s) => s.user_id === userId);
+    const self = userId === board.me.userId;
+    return {
+      name: fromCrew?.name || fromShift?.name || (self ? board.me.name : "Crew"),
+      image: fromCrew?.image || fromShift?.image || (self ? me?.profileImageUrl : null) || null,
+    };
+  }
   return (
     <section className="flex flex-col gap-4">
       {founder ? (
@@ -127,11 +181,30 @@ export function Comms({ board, founder, run }: { board: Board; founder: boolean;
       ) : null}
       {board.ops.comms.slice().reverse().map((m) => {
         const mine = board.ops.acks.some((a) => a.postId === m.id && a.userId === board.me.userId);
+        const acks = board.ops.acks.filter((a) => a.postId === m.id);
         return (
           <article key={m.id} className={card}>
             <h3 className="font-display text-lg">{m.title}</h3>
             <p className="mt-2 text-sm">{m.body}</p>
-            {m.mustAck && !mine ? <button type="button" className={`${btn} mt-3`} onClick={() => persist(board, { ...board.ops, acks: [...board.ops.acks, { postId: m.id, userId: board.me.userId }] }, run)}>Acknowledge</button> : null}
+            {m.mustAck && !mine ? (
+              <button type="button" className={`${btn} mt-3`} onClick={() => {
+                const who = person(board.me.userId);
+                persist(board, { ...board.ops, acks: [...board.ops.acks, { postId: m.id, userId: board.me.userId, name: who.name, image: who.image, at: new Date().toISOString() }] }, run);
+              }}>Acknowledge</button>
+            ) : null}
+            {acks.length ? (
+              <div className="mt-4 flex flex-wrap gap-3 border-t border-line pt-3">
+                {acks.map((a) => {
+                  const who = person(a.userId);
+                  return (
+                    <div key={a.userId} className="flex w-12 flex-col items-center gap-1">
+                      <Face name={a.name || who.name} image={a.image || who.image} />
+                      <span className="text-[10px] leading-tight text-muted">{stamp(a.at) || "seen"}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : m.mustAck ? <p className="mt-3 text-sm text-muted">No acknowledgements yet.</p> : null}
           </article>
         );
       })}
@@ -166,16 +239,48 @@ export function Artists({ board, founder, run }: { board: Board; founder: boolea
   );
 }
 
-export function BrandPack({ board }: { board: Board; founder: boolean; run: Save }) {
+function fileName(path: string, fallback: string) {
+  if (path.startsWith("data:")) return fallback.replace(/\s+/g, "-").toLowerCase();
+  const part = path.split("/").pop() || fallback;
+  return part.split("?")[0] || fallback;
+}
+
+export function BrandPack({ board, founder, run }: { board: Board; founder: boolean; run: Save }) {
   return (
-    <section className="grid gap-3 sm:grid-cols-3">
-      {board.ops.brand.map((b) => (
-        <article key={b.id} className={card}>
-          {b.path ? <img src={b.path} alt="" className="h-28 w-full rounded-xl object-cover" /> : null}
-          <p className="mt-2 font-medium">{b.name}</p>
-          <p className="text-sm text-muted">{b.kind} · {b.current ? "current" : "archive"}</p>
-        </article>
-      ))}
+    <section className="flex flex-col gap-4">
+      {founder ? (
+        <label className={`${card} flex cursor-pointer flex-col gap-2 text-sm`}>
+          <span className="font-medium">Upload media</span>
+          <span className="text-muted">PNG, JPG or SVG. Saved to the brand pack for the crew.</span>
+          <input type="file" accept="image/*" className="text-sm" onChange={(e) => {
+            const file = e.target.files?.[0];
+            e.target.value = "";
+            if (!file) return;
+            if (file.size > 2500000) {
+              window.alert("Keep uploads under 2.5 MB.");
+              return;
+            }
+            const reader = new FileReader();
+            reader.onload = () => {
+              persist(board, { ...board.ops, brand: [...board.ops.brand, { id: uid("b"), name: file.name.replace(/\.[^.]+$/, ""), kind: "Upload", path: String(reader.result || ""), current: true, notes: file.name }] }, run);
+            };
+            reader.readAsDataURL(file);
+          }} />
+        </label>
+      ) : null}
+      <div className="grid gap-3 sm:grid-cols-3">
+        {board.ops.brand.map((b) => (
+          <article key={b.id} className={card}>
+            {b.path ? <img src={b.path} alt="" className="h-28 w-full rounded-xl object-cover" /> : null}
+            <p className="mt-2 font-medium">{b.name}</p>
+            <p className="text-sm text-muted">{b.kind} · {b.current ? "current" : "archive"}</p>
+            <div className="mt-3 flex flex-wrap gap-2">
+              {b.path ? <a href={b.path} download={fileName(b.path, b.name)} className="min-h-11 rounded-xl border border-line px-3 text-sm leading-[2.75rem]">Download</a> : null}
+              {founder ? <button type="button" className="min-h-11 text-sm text-bad" onClick={() => persist(board, { ...board.ops, brand: board.ops.brand.filter((x) => x.id !== b.id) }, run)}>Remove</button> : null}
+            </div>
+          </article>
+        ))}
+      </div>
     </section>
   );
 }
