@@ -84,8 +84,11 @@ export const loadBoard = createServerFn({ method: "GET" })
       me.founder
         ? sql<{ note: string }>`select note from sync_state where key = 'humanitix'`
         : Promise.resolve([]),
-      sql<{ user_id: string; name: string; rank: string }>`
-        select user_id, name, rank from profiles order by rank, name
+      sql<{ user_id: string; name: string; rank: string; image: string | null }>`
+        select p.user_id, p.name, p.rank, u.image
+        from profiles p
+        left join "user" u on u.id = p.user_id
+        order by p.rank, p.name
       `,
       sql<{ note: string }>`select note from sync_state where key = 'ops'`,
     ]);
