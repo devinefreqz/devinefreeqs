@@ -6,7 +6,7 @@ export type Ops = {
   incidents: { id: string; eventId: number | null; date: string; reporter: string; severity: string; notes: string; status: string }[];
   kits: { id: string; name: string; location: string; lastChecked: string; ok: boolean }[];
   comms: { id: string; title: string; body: string; link: string; eventId: number | null; mustAck: boolean; created: string }[];
-  acks: { postId: string; userId: string }[];
+  acks: { postId: string; userId: string; name?: string; image?: string | null; at?: string }[];
   artists: { id: string; name: string; eventId: number; setLength: string; fee: number; split: string; rider: string; pub: boolean }[];
   brand: { id: string; name: string; kind: string; path: string; current: boolean; notes: string }[];
   rates: { id: string; basis: string; key: string; amount: number }[];
