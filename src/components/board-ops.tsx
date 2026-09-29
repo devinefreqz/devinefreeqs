@@ -69,21 +69,32 @@ export function CoverageGaps({ board }: { board: Board }) {
   );
 }
 
+function sheetText(board: Board, eventId: number) {
+  const saved = board.ops.sheets?.[String(eventId)];
+  if (typeof saved === "string") return saved;
+  return board.ops.run
+    .filter((r) => r.eventId === eventId)
+    .slice()
+    .sort((a, b) => a.time.localeCompare(b.time))
+    .map((r) => [r.time, r.title, r.lead, r.channel].filter(Boolean).join(" · "))
+    .join("\n");
+}
+
 export function RunSheet({ board, founder, run }: { board: Board; founder: boolean; run: Save }) {
   const [open, setOpen] = useState<number | null>(board.events[0]?.id ?? null);
   if (!board.events.length) return <p className={`${card} text-sm text-muted`}>Add an event first, then drop its run sheet from the listing.</p>;
   return (
     <section className="flex flex-col gap-3">
-      <p className="text-sm text-muted">{founder ? "Open a night to edit its cues. Each event keeps its own sheet." : "Open a night to view its cues."}</p>
+      <p className="text-sm text-muted">{founder ? "Open a night to edit its run sheet. Each event keeps its own." : "Open a night to read its run sheet."}</p>
       {board.events.map((ev) => {
-        const rows = board.ops.run.filter((r) => r.eventId === ev.id).slice().sort((a, b) => a.time.localeCompare(b.time));
+        const text = sheetText(board, ev.id);
         const shown = open === ev.id;
         return (
           <article key={ev.id} className={card}>
             <button type="button" className="flex w-full items-center justify-between gap-3 text-left" onClick={() => setOpen(shown ? null : ev.id)} aria-expanded={shown}>
               <div>
                 <h3 className="font-display text-lg">{ev.name}</h3>
-                <p className="text-sm text-muted">{String(ev.event_date).slice(0, 10)} · {ev.event_time} · {ev.venue} · {rows.length} cues</p>
+                <p className="text-sm text-muted">{String(ev.event_date).slice(0, 10)} · {ev.event_time} · {ev.venue}</p>
               </div>
               <span className="grid h-10 w-10 place-items-center rounded-full border border-line text-lg" aria-hidden>
                 {shown ? "▾" : "▸"}
@@ -91,31 +102,20 @@ export function RunSheet({ board, founder, run }: { board: Board; founder: boole
             </button>
             {shown ? (
               <div className="mt-4 border-t border-line pt-3">
-                {rows.map((r) => (
-                  <div key={r.id} className="flex items-start justify-between gap-3 border-b border-line py-3 last:border-0">
-                    <p className="text-sm">{r.time} · {r.title}{r.lead ? ` · ${r.lead}` : ""}{r.channel ? ` · ${r.channel}` : ""}</p>
-                    {founder ? (
-                      <button type="button" className="text-sm text-bad" onClick={() => persist(board, { ...board.ops, run: board.ops.run.filter((x) => x.id !== r.id) }, run)}>
-                        Remove
-                      </button>
-                    ) : null}
-                  </div>
-                ))}
-                {!rows.length ? <p className="text-sm text-muted">No cues on this night yet.</p> : null}
                 {founder ? (
-                  <form className="mt-4 grid gap-3 sm:grid-cols-2" onSubmit={(e) => {
+                  <form className="grid gap-3" onSubmit={(e) => {
                     e.preventDefault();
-                    const f = new FormData(e.currentTarget);
-                    persist(board, { ...board.ops, run: [...board.ops.run, { id: uid("rs"), eventId: ev.id, time: String(f.get("time")), title: String(f.get("title")), lead: String(f.get("lead") || ""), channel: String(f.get("channel") || ""), notes: String(f.get("notes") || "") }] }, run);
-                    e.currentTarget.reset();
+                    const body = String(new FormData(e.currentTarget).get("body") ?? "");
+                    persist(board, { ...board.ops, sheets: { ...(board.ops.sheets || {}), [String(ev.id)]: body } }, run);
                   }}>
-                    <input name="time" type="time" required className={field} />
-                    <input name="title" placeholder="Cue" required className={field} />
-                    <input name="lead" placeholder="Lead" className={field} />
-                    <input name="channel" placeholder="Channel" className={field} />
-                    <button type="submit" className={btn}>Add cue</button>
+                    <textarea key={text} name="body" defaultValue={text} placeholder="Load-in, doors, sets, lock-up" className="min-h-48 w-full rounded-xl border border-line bg-bg px-3 py-2 text-sm" />
+                    <button type="submit" className={btn}>Save run sheet</button>
                   </form>
-                ) : null}
+                ) : text.trim() ? (
+                  <p className="whitespace-pre-wrap text-sm">{text}</p>
+                ) : (
+                  <p className="text-sm text-muted">No run sheet for this night yet.</p>
+                )}
               </div>
             ) : null}
           </article>
