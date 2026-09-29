@@ -3,6 +3,7 @@ import { authMiddleware } from "@/lib/auth/middleware";
 
 export type Ops = {
   run: { id: string; eventId: number; time: string; title: string; lead: string; channel: string; notes: string }[];
+  sheets: Record<string, string>;
   incidents: { id: string; eventId: number | null; date: string; reporter: string; severity: string; notes: string; status: string }[];
   kits: { id: string; name: string; location: string; lastChecked: string; ok: boolean }[];
   comms: { id: string; title: string; body: string; link: string; eventId: number | null; mustAck: boolean; created: string }[];
@@ -18,6 +19,7 @@ export type Ops = {
 
 export const emptyOps = (): Ops => ({
   run: [],
+  sheets: {},
   incidents: [],
   kits: [
     { id: "k1", name: "Floor med bag", location: "Production case", lastChecked: "2026-09-12", ok: true },
@@ -47,7 +49,7 @@ export function parseOps(raw: string | null | undefined): Ops {
   if (!raw) return base;
   try {
     const parsed = JSON.parse(raw) as Partial<Ops>;
-    return { ...base, ...parsed, kits: parsed.kits?.length ? parsed.kits : base.kits, brand: parsed.brand?.length ? parsed.brand : base.brand, rates: parsed.rates?.length ? parsed.rates : base.rates };
+    return { ...base, ...parsed, sheets: parsed.sheets || base.sheets, kits: parsed.kits?.length ? parsed.kits : base.kits, brand: parsed.brand?.length ? parsed.brand : base.brand, rates: parsed.rates?.length ? parsed.rates : base.rates };
   } catch {
     return base;
   }
