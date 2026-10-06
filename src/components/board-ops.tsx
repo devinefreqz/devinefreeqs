@@ -213,28 +213,135 @@ export function Comms({ board, founder, run }: { board: Board; founder: boolean;
 }
 
 export function Artists({ board, founder, run }: { board: Board; founder: boolean; run: Save }) {
+  const saveArtist = (id: string, f: FormData) => {
+    persist(
+      board,
+      {
+        ...board.ops,
+        artists: board.ops.artists.map((a) =>
+          a.id === id
+            ? {
+                ...a,
+                name: String(f.get("name") || a.name).trim() || a.name,
+                eventId: Number(f.get("eventId") || a.eventId),
+                setLength: String(f.get("setLength") || ""),
+                fee: Number(f.get("fee") || 0),
+                split: String(f.get("split") || ""),
+                rider: String(f.get("rider") || ""),
+                pub: f.get("pub") === "on",
+              }
+            : a,
+        ),
+      },
+      run,
+    );
+  };
+
   return (
     <section className="flex flex-col gap-4">
       {founder ? (
-        <form className={`${card} grid gap-3 sm:grid-cols-2`} onSubmit={(e) => {
-          e.preventDefault();
-          const f = new FormData(e.currentTarget);
-          persist(board, { ...board.ops, artists: [...board.ops.artists, { id: uid("a"), name: String(f.get("name")), eventId: Number(f.get("eventId")), setLength: String(f.get("setLength") || ""), fee: Number(f.get("fee") || 0), split: String(f.get("split") || ""), rider: String(f.get("rider") || ""), pub: true }] }, run);
-          e.currentTarget.reset();
-        }}>
+        <form
+          className={`${card} grid gap-3 sm:grid-cols-2`}
+          onSubmit={(e) => {
+            e.preventDefault();
+            const f = new FormData(e.currentTarget);
+            persist(
+              board,
+              {
+                ...board.ops,
+                artists: [
+                  ...board.ops.artists,
+                  {
+                    id: uid("a"),
+                    name: String(f.get("name")),
+                    eventId: Number(f.get("eventId")),
+                    setLength: String(f.get("setLength") || ""),
+                    fee: Number(f.get("fee") || 0),
+                    split: String(f.get("split") || ""),
+                    rider: String(f.get("rider") || ""),
+                    pub: true,
+                  },
+                ],
+              },
+              run,
+            );
+            e.currentTarget.reset();
+          }}
+        >
           <input name="name" required placeholder="Artist" className={field} />
-          <select name="eventId" className={field}>{board.events.map((ev) => <option key={ev.id} value={ev.id}>{ev.name}</option>)}</select>
+          <select name="eventId" className={field}>
+            {board.events.map((ev) => (
+              <option key={ev.id} value={ev.id}>
+                {ev.name}
+              </option>
+            ))}
+          </select>
           <input name="setLength" placeholder="Set length" className={field} />
           <input name="fee" type="number" min="0" step="0.01" placeholder="Fee AUD" className={field} />
-          <button type="submit" className={btn}>Add booking</button>
+          <input name="split" placeholder="Split / deal notes" className={field} />
+          <input name="rider" placeholder="Rider notes" className={field} />
+          <button type="submit" className={btn}>
+            Add booking
+          </button>
         </form>
       ) : null}
-      {board.ops.artists.filter((a) => a.pub || founder).map((a) => (
-        <article key={a.id} className={card}>
-          <h3 className="font-display text-lg">{a.name}</h3>
-          <p className="text-sm text-muted">{eventName(board, a.eventId)} · {a.setLength}{founder ? ` · ${money.format(a.fee)}` : ""}</p>
-        </article>
-      ))}
+      {board.ops.artists
+        .filter((a) => a.pub || founder)
+        .map((a) =>
+          founder ? (
+            <form
+              key={a.id}
+              className={`${card} grid gap-3 sm:grid-cols-2`}
+              onSubmit={(e) => {
+                e.preventDefault();
+                saveArtist(a.id, new FormData(e.currentTarget));
+              }}
+            >
+              <input name="name" required defaultValue={a.name} placeholder="Artist" className={field} />
+              <select name="eventId" defaultValue={a.eventId} className={field}>
+                {board.events.map((ev) => (
+                  <option key={ev.id} value={ev.id}>
+                    {ev.name}
+                  </option>
+                ))}
+              </select>
+              <input name="setLength" defaultValue={a.setLength} placeholder="Set length" className={field} />
+              <input name="fee" type="number" min="0" step="0.01" defaultValue={a.fee} placeholder="Fee AUD" className={field} />
+              <input name="split" defaultValue={a.split} placeholder="Split / deal notes" className={field} />
+              <input name="rider" defaultValue={a.rider} placeholder="Rider notes" className={field} />
+              <label className="flex min-h-11 items-center gap-2 text-sm">
+                <input name="pub" type="checkbox" defaultChecked={a.pub} className="h-4 w-4" />
+                Show to crew
+              </label>
+              <div className="flex flex-wrap gap-2 sm:col-span-2">
+                <button type="submit" className={btn}>
+                  Save
+                </button>
+                <button
+                  type="button"
+                  className="min-h-11 rounded-xl border border-line px-4 text-sm text-bad"
+                  onClick={() =>
+                    persist(board, { ...board.ops, artists: board.ops.artists.filter((x) => x.id !== a.id) }, run)
+                  }
+                >
+                  Remove
+                </button>
+              </div>
+            </form>
+          ) : (
+            <article key={a.id} className={card}>
+              <h3 className="font-display text-lg">{a.name}</h3>
+              <p className="text-sm text-muted">
+                {eventName(board, a.eventId)} · {a.setLength}
+              </p>
+              {a.split || a.rider ? (
+                <p className="mt-2 text-sm text-muted">
+                  {[a.split, a.rider].filter(Boolean).join(" · ")}
+                </p>
+              ) : null}
+            </article>
+          ),
+        )}
     </section>
   );
 }
