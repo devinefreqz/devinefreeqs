@@ -5,46 +5,37 @@ import { Events } from "@/components/board-events";
 import { CrewList, Finance, Gear, Overview } from "@/components/board-panels";
 import {
   Artists,
-  BrandPack,
   Comms,
   CoverageGaps,
   NextShift,
   PayrollPanel,
-  RunSheet,
   Safety,
-  TicketsPanel,
 } from "@/components/board-ops";
 
 type Board = Awaited<ReturnType<typeof loadBoard>>;
 type View =
   | "overview"
   | "events"
-  | "runsheet"
   | "safety"
   | "comms"
   | "finance"
-  | "tickets"
   | "payroll"
   | "equipment"
   | "artists"
-  | "brand"
   | "crew";
 
 const NAV: { id: View; label: string }[] = [
   { id: "overview", label: "Overview" },
   { id: "events", label: "Events" },
-  { id: "runsheet", label: "Run Sheet" },
   { id: "safety", label: "Safety" },
   { id: "comms", label: "Comms" },
   { id: "finance", label: "Finance" },
-  { id: "tickets", label: "Tickets" },
   { id: "payroll", label: "Payroll" },
   { id: "equipment", label: "Equipment" },
   { id: "artists", label: "Artists" },
-  { id: "brand", label: "Brand" },
   { id: "crew", label: "Crew" },
 ];
-const CREW_VIEWS = new Set<View>(["events", "runsheet", "safety", "comms", "artists", "brand", "crew"]);
+const CREW_VIEWS = new Set<View>(["events", "safety", "comms", "artists", "crew"]);
 
 export function Board() {
   const [board, setBoard] = useState<Board | null>(null);
@@ -172,15 +163,12 @@ export function Board() {
           </>
         ) : null}
         {shown === "events" ? <Events board={board} founder={founder} run={run} /> : null}
-        {shown === "runsheet" ? <RunSheet board={board} founder={founder} run={run} /> : null}
         {shown === "safety" ? <Safety board={board} founder={founder} run={run} /> : null}
         {shown === "comms" ? <Comms board={board} founder={founder} run={run} /> : null}
         {shown === "finance" && founder ? <Finance board={board} founder={founder} income={income} expense={expense} run={run} /> : null}
-        {shown === "tickets" && founder ? <TicketsPanel board={board} founder={founder} run={run} /> : null}
         {shown === "payroll" && founder ? <PayrollPanel board={board} founder={founder} run={run} /> : null}
         {shown === "equipment" && founder ? <Gear board={board} founder={founder} total={gearValue} run={run} /> : null}
         {shown === "artists" ? <Artists board={board} founder={founder} run={run} /> : null}
-        {shown === "brand" ? <BrandPack board={board} founder={founder} run={run} /> : null}
         {shown === "crew" ? <CrewList crew={board.crew} /> : null}
       </main>
     </div>
