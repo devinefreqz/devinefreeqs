@@ -11,7 +11,7 @@ export type Ops = {
   artists: { id: string; name: string; eventId: number; setLength: string; fee: number; split: string; rider: string; pub: boolean }[];
   brand: { id: string; name: string; kind: string; path: string; current: boolean; notes: string }[];
   rates: { id: string; basis: string; key: string; amount: number }[];
-  pay: { id: string; eventId: number; userId: string; name: string; role: string; hours: number; amount: number; status: string }[];
+  pay: { id: string; eventId: number; userId: string; name: string; role: string; hours: number; rate?: number; amount: number; status: string }[];
   tickets: Record<string, { presale: number; door: number; comps: number; guests: number }>;
   eventMeta: Record<string, { callTime?: string; capacity?: number; caps?: Record<string, number>; onSite?: Record<string, boolean> }>;
   medbag: string;
